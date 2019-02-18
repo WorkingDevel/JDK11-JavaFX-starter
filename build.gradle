@@ -1,0 +1,112 @@
+buildscript {
+    ext {
+        versions = [
+                guice                : '4.2.+:no_aop',
+                guava                : '26.0-jre',
+                slf4j                : '1.8.0-beta2',
+                jetbrains_annotations: '16.0.3',
+                javafx               : '11',
+                junit                : '5.3.+'
+        ]
+    }
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.google.gradle:osdetector-gradle-plugin:1.6.+'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'application'
+}
+
+apply plugin: 'com.google.osdetector'
+
+ext {
+    platform = osdetector.os == 'osx' ? 'mac' : osdetector.os == 'windows' ? 'win' : osdetector.os
+    moduleName = rootProject.name
+}
+
+group 'org.example.jdk11.javafx'
+version '0.0.1-SNAPSHOT'
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+mainClassName = 'org.example.jdk11.javafx.starter.Application'
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+    implementation "org.openjfx:javafx-base:${versions.javafx}:$platform"
+    implementation "org.openjfx:javafx-graphics:${versions.javafx}:$platform"
+    implementation "org.openjfx:javafx-controls:${versions.javafx}:$platform"
+    implementation "org.openjfx:javafx-fxml:${versions.javafx}:$platform"
+    implementation "org.slf4j:slf4j-api:${versions.slf4j}"
+    implementation "org.slf4j:slf4j-jdk14:${versions.slf4j}"
+    implementation "org.slf4j:jcl-over-slf4j:${versions.slf4j}"
+
+    // Use JUnit test framework
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${versions.junit}"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:${versions.junit}"
+    testImplementation "org.junit.jupiter:junit-jupiter-params:${versions.junit}"
+    testImplementation 'org.hamcrest:hamcrest:2.+'
+}
+
+allprojects {
+    afterEvaluate {
+        repositories {
+            jcenter()
+        }
+
+        // tag::autoModuleName[]
+        jar {
+            inputs.property("moduleName", moduleName)
+            manifest {
+                attributes('Automatic-Module-Name': moduleName)
+            }
+        }
+        // end::autoModuleName[]
+
+        compileJava {
+            inputs.property("moduleName", moduleName)
+            doFirst {
+                options.compilerArgs = [
+                        '--module-path', classpath.asPath,
+                ]
+                classpath = files()
+            }
+        }
+
+        compileTestJava {
+            inputs.property("moduleName", moduleName)
+            doFirst {
+                options.compilerArgs = [
+                        '--module-path', classpath.asPath,
+                        '--add-modules', 'org.junit.jupiter.api,org.hamcrest',
+                        '--add-reads', "$moduleName=org.junit.jupiter.api",
+                        '--patch-module', "$moduleName=" + files(sourceSets.test.java.srcDirs).asPath,
+                ]
+                classpath = files()
+            }
+        }
+
+        test {
+            inputs.property("moduleName", moduleName)
+            doFirst {
+                jvmArgs = [
+                        '--module-path', classpath.asPath,
+                        '--add-modules', 'ALL-MODULE-PATH',
+                        '--add-reads', "$moduleName=org.junit.jupiter.api",
+                        '--patch-module', "$moduleName=" + files(sourceSets.test.java.outputDir).asPath,
+                ]
+                classpath = files()
+            }
+        }
+    }
+}
